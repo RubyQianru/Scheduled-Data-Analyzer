@@ -3,6 +3,8 @@ from statistics import mean
 from pymongo import MongoClient
 from config import MONGO_URI, CRYPTO_DB, USERNAME, PASSWORD, TWITTER_DB, REPORT_DB
 from util.text import clean_text, vader_sentiment
+from datetime import datetime
+
 
 client = MongoClient(MONGO_URI, username=USERNAME, password=PASSWORD)
 crypto_db = client[CRYPTO_DB]
@@ -84,13 +86,15 @@ def get_tweets(symbol:str = "BTC", days:int = 1):
 
 def merge_results(price, twitter):
     merged_data = {}
-    
+    current_time = datetime.now()
+
     for item in price:
       merged_data[item] = price[item]
     for item in twitter:
       merged_data[item] = twitter[item]
     
     merged_data['symbol'] = merged_data['_id']
+    merged_data['time'] = current_time
     del merged_data['_id']
 
     return merged_data
