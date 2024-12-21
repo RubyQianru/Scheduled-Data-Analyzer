@@ -17,6 +17,46 @@ report_db = client[REPORT_DB]
 report_collection = report_db["sentiment_report"]
 
 
+def get_sma(symbol: str = "BTC", days: int = 10):
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+    
+    pipeline = [
+        {"$match": {
+            "symbol": symbol,
+            "time": {"$gte": start_date, "$lte": end_date}
+        }},
+        {"$sort": {"time": 1}},
+        {"$group": {
+            "_id": None,
+            "prices": {"$push": "$price"},
+            "times": {"$push": "$time"}
+        }},
+        {"$project": {
+            "prices": 1,
+            "times": 1,
+            "sma_5": {
+                "$avg": {"$slice": ["$prices", {"$subtract": [{"$size": "$prices"}, 5]}]}
+            },
+            "sma_10": {
+                "$avg": {"$slice": ["$prices", {"$subtract": [{"$size": "$prices"}, 10]}]}
+            }
+        }}
+    ]
+    
+    data = list(crypto_collection.aggregate(pipeline))
+    
+    if data:
+        data = data[0]
+        return {
+          "symbol": symbol,
+          "sma_5": data["sma_5"],
+          "sma_10": data["sma_10"],
+        }
+    else:
+        return None
+
+
 def get_price(symbol:str = "BTC", days:int = 1):
 
   query = {"symbol": symbol}
@@ -84,7 +124,7 @@ def get_tweets(symbol:str = "BTC", days:int = 1):
   return result
 
 
-def merge_results(price, twitter):
+def merge_results(price, twitter, sma):
     merged_data = {}
     current_time = datetime.now()
 
@@ -92,8 +132,9 @@ def merge_results(price, twitter):
       merged_data[item] = price[item]
     for item in twitter:
       merged_data[item] = twitter[item]
+    for item in sma:
+      merged_data[item] = sma[item]
     
-    merged_data['symbol'] = merged_data['_id']
     merged_data['time'] = current_time
     del merged_data['_id']
 
